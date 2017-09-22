@@ -107,4 +107,4 @@ sub pipeline_analyses {
   return [ map { @{$_->pipeline_analyses($self)} } $self->available_tools ];
 }
 
-;
+1;
