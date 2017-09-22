@@ -1,6 +1,7 @@
 /*/htdocs/info/docs/Doxygen/*/*
 /*/htdocs/opensearch
 tools/utils/beekeeper.config
+tools_hive/utils/beekeeper.config
 tools/utils/beekeeper.cronlog
 tools/utils/beekeeper.log
 blib/
