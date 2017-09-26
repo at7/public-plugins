@@ -125,10 +125,57 @@ sub get_form_details {
   my $self = shift;
   if(!exists($self->{_form_details})) {
     # core form
+    
+
+
     $self->{_form_details} = {
+      ld_calculation => {
+        'label' => 'Choose calculation',
+        'helptip' => 
+          '<b>Compute pairwise LD values in a region, compute all pairwise LD values for list of variants, or</b>'.
+          '<b>compute all LD values for a given variant and all variants that are not further away from the</b>'.
+          '<b>given variant than a given window size.</b>',
+        'values' => [
+          { 'value' => 'region', 'caption' => 'Pairwise LD in a given region' },
+          { 'value' => 'pairwise', 'caption' => 'Pairwise LD for a given list of variants' },
+          { 'value' => 'variant', 'caption' => 'LD for a given variant within a defined region' },
+        ],
+      },
+      r2_threshold => {
+        'label' => 'r2',
+        'helptip' => 'Only include variants whose r2 value is greater than the given value'
+      },
+      d_prime_threshold => {
+        'label' => 'd_prime',
+        'helptip' => 'Only include variants whose d_prime value is greater than the given value'
+      },
+      window_size => {
+        'label' => 'window size',
+        'helptip' => 'Only compute LD between the input variant and all variants that are not further away from the input variant than the given window size',
+      },
     };
   }
   return $self->{_form_details};
+}
+
+sub populations_with_LD {
+  my $self = shift;
+  my $hub = $self->hub;
+  my $sd = $hub->species_defs;
+  for ($self->valid_species) {
+    my $db_config = $sd->get_config($_, 'databases');
+    if ($db_config->{'DATABASE_VARIATION'}) {
+      if (! defined $self->{'_population_list'}->{$_}) {
+        my $adaptor = $self->hub->get_adaptor('get_PopulationAdaptor', 'variation', $_);
+        my $ld_populations = $adaptor->fetch_all_LD_Populations;
+        foreach my $ld_population (@$ld_populations) {
+          my $name = $ld_population->name;
+          push @{$self->{'_population_list'}->{$_}}, {'value' => $name, 'caption' => $name};
+        }
+      }
+    }
+  }
+  return $self->{'_population_list'};
 }
 
 sub species_list {
@@ -139,22 +186,21 @@ sub species_list {
   if (!$self->{'_species_list'}) {
     my $hub     = $self->hub;
     my $sd      = $hub->species_defs;
-
     my @species;
 
     for ($self->valid_species) {
 
       my $db_config = $sd->get_config($_, 'databases');
 
-      # example data for each species
-
-      push @species, {
-        'value'       => $_,
-        'caption'     => $sd->species_label($_, 1),
-        'assembly'    => $sd->get_config($_, 'ASSEMBLY_NAME') // undef,
-      };
+      if ($db_config->{'DATABASE_VARIATION'}) {
+        # if has enough sample genotype data for LD computation
+        push @species, {
+          'value'       => $_,
+          'caption'     => $sd->species_label($_, 1),
+          'assembly'    => $sd->get_config($_, 'ASSEMBLY_NAME') // undef,
+        };
+      }
     }
-
     @species = sort { $a->{'caption'} cmp $b->{'caption'} } @species;
 
     $self->{'_species_list'} = \@species;

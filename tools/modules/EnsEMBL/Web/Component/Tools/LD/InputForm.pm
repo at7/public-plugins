@@ -46,6 +46,25 @@ sub get_cacheable_form_node {
   my $input_fieldset  = $form->add_fieldset({'no_required_notes' => 1});
   my $input_formats   = [{ 'value' => 'region', 'caption' => 'Genomic regions', 'example' => qq(1  809238  909238\n3  361464  861464) },];
 
+
+  # choose method
+  $input_fieldset->add_field({
+      'field_class'   => '_stt_rfq',
+      'type'          => 'radiolist',
+      'name'          => 'ld_calculation',
+      'label'         => $fd->{ld_calculation}->{label},
+      'helptip'       => $fd->{ld_calculation}->{helptip},
+      'value'         => 'calculation',
+      'class'         => '_stt',
+      'values'        => $fd->{ld_calculation}->{values}
+  });
+
+  $input_fieldset->add_field({
+    'type'          => 'string',
+    'name'          => 'name',
+    'label'         => 'Name for this job (optional)'
+  });
+
   $input_fieldset->add_field({
     'label'         => 'Species',
     'elements'      => [{
@@ -62,11 +81,19 @@ sub get_cacheable_form_node {
     ]
   });
 
-  $input_fieldset->add_field({
-    'type'          => 'string',
-    'name'          => 'name',
-    'label'         => 'Name for this job (optional)'
-  });
+  my $populations = $object->populations_with_LD;
+
+  for (keys %$populations) {
+    $input_fieldset->add_field({
+      'type'          => 'dropdown',
+      'name'          => 'populations',
+      'label'         => 'Select one or more populations',
+      'values'        => $populations->{$_},
+      'size'          => '10',
+      'class'         => 'tools_listbox',
+      'multiple'      => '1'
+    });
+  }
 
   $input_fieldset->add_field({
     'label'         => 'Either paste data',
@@ -92,13 +119,11 @@ sub get_cacheable_form_node {
   });
 
   $input_fieldset->add_field({
-    'type'          => 'dropdown',
-    'name'          => 'populations',
-    'label'         => 'Select one or more populations',
-    'values'        => $self->get_populations(),
-    'size'          => '10',
-    'class'         => 'tools_listbox',
-    'multiple'      => '1'
+    'type'          => 'url',
+    'name'          => 'url',
+    'label'         => 'Or provide file URL',
+    'size'          => 30,
+    'class'         => 'url'
   });
 
   $input_fieldset->add_field({
@@ -111,6 +136,12 @@ sub get_cacheable_form_node {
     'type'          => 'string',
     'name'          => 'd_prime',
     'label'         => "Threshold for D'"
+  });
+
+  $input_fieldset->add_field({
+    'type'          => 'string',
+    'name'          => 'window_size',
+    'label'         => "Window size"
   });
 
   # Run/Close buttons
