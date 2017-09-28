@@ -45,16 +45,16 @@ sub get_cacheable_form_node {
   my $fd              = $object->get_form_details;
   my $input_fieldset  = $form->add_fieldset({'no_required_notes' => 1});
   my $input_formats   = [{ 'value' => 'region', 'caption' => 'Genomic regions', 'example' => qq(1  809238  909238\n3  361464  861464) },];
+  my $input_formats_variant   = [{ 'value' => 'region', 'caption' => 'Variant IDs', 'example' => qq(rs699\nrs7383789) },];
 
 
   # choose method
   $input_fieldset->add_field({
-      'field_class'   => '_stt_rfq',
       'type'          => 'radiolist',
       'name'          => 'ld_calculation',
       'label'         => $fd->{ld_calculation}->{label},
       'helptip'       => $fd->{ld_calculation}->{helptip},
-      'value'         => 'calculation',
+      'value'         => 'region',
       'class'         => '_stt',
       'values'        => $fd->{ld_calculation}->{values}
   });
@@ -81,32 +81,51 @@ sub get_cacheable_form_node {
     ]
   });
 
-  my $populations = $object->populations_with_LD;
+  my $LD_populations = $object->LD_populations;
 
-  for (keys %$populations) {
+  for my $species_name (keys %$LD_populations) {
     $input_fieldset->add_field({
       'type'          => 'dropdown',
       'name'          => 'populations',
       'label'         => 'Select one or more populations',
-      'values'        => $populations->{$_},
+      'values'        => $LD_populations->{$species_name},
       'size'          => '10',
-      'class'         => 'tools_listbox',
+      'class'         => "_stt_$species_name",
       'multiple'      => '1'
     });
   }
 
   $input_fieldset->add_field({
+    'field_class' => '_stt_region',
     'label'         => 'Either paste data',
     'elements'      => [{
       'type'          => 'text',
       'name'          => 'text',
-      'class'         => 'ld-region-input',
+      'class'         => '_stt_region',
+    }, {
+      'class'         => '_stt_region',
+      'type'          => 'noedit',
+      'noinput'       => 1,
+      'is_html'       => 1,
+      'caption'       => sprintf('<span class="small"><b>Example input:&nbsp;</b>%s</span>',
+        join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats))
+      )
+    },]
+  });
+
+  $input_fieldset->add_field({
+    'field_class' => [qw/_stt_pairwise _stt_variant/],
+    'label'         => 'Either paste data',
+    'elements'      => [{
+      'type'          => 'text',
+      'name'          => 'text',
+      'class'         => '_stt_pairwise _stt_variant',
     }, {
       'type'          => 'noedit',
       'noinput'       => 1,
       'is_html'       => 1,
-      'caption'       => sprintf('<span class="small"><b>Examples:&nbsp;</b>%s</span>',
-        join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats))
+      'caption'       => sprintf('<span class="small"><b>Example input:&nbsp;</b>%s</span>',
+        join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats_variant))
       )
     },]
   });
@@ -129,20 +148,28 @@ sub get_cacheable_form_node {
   $input_fieldset->add_field({
     'type'          => 'string',
     'name'          => 'r2',
-    'label'         => 'Threshold for r2'
+    'label'         => 'Threshold for r2',
+    'value' => '0.8',
   });
 
   $input_fieldset->add_field({
     'type'          => 'string',
     'name'          => 'd_prime',
-    'label'         => "Threshold for D'"
+    'label'         => "Threshold for D'",
+    'value' => '0.8',
   });
 
   $input_fieldset->add_field({
-    'type'          => 'string',
-    'name'          => 'window_size',
-    'label'         => "Window size"
+    'field_class' => '_stt_variant',
+    'label' => 'Window size',
+    'elements' => [{
+      'name'  => 'window_size',
+      'element_class' => '_stt_variant',
+      'type'  => 'string',
+      'value' => '100000',
+    }]
   });
+
 
   # Run/Close buttons
   $self->add_buttons_fieldset($form, {'reset' => 'Clear', 'cancel' => 'Close form'});
