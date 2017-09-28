@@ -69,16 +69,16 @@ sub get_edit_jobs_data {
 sub result_files {
   ## Gets the result stats and ouput files
   my $self = shift;
-
   if (!$self->{'_results_files'}) {
     my $ticket      = $self->get_requested_ticket or return;
     my $job         = $ticket->job->[0] or return;
     my $job_config  = $job->dispatcher_data->{'config'};
+    my @output_file_names = @{$job_config->{'output_file_names'}};
     my $job_dir     = $job->job_dir;
-
-    $self->{'_results_files'} = {
-      'output_file' => EnsEMBL::Web::TmpFile::ToolsOutput->new('filename' => "$job_dir/$job_config->{'output_file'}"),
-    };
+    my $output_file = $job_config->{'output_file'} || 'no output file defined';
+    foreach my $output_file (@output_file_names) {
+      $self->{'_results_files'}->{$output_file} = EnsEMBL::Web::TmpFile::ToolsOutput->new('filename' => "$job_dir/$output_file");
+    } 
   }
 
   return $self->{'_results_files'};
@@ -90,50 +90,26 @@ sub handle_download {
   my $hub = $self->hub;
   my $job = $self->get_requested_job;
 
-  # if downloading the input file
-  if ($hub->param('input')) {
+  my $output_file = $hub->param('output_file');
+  my $file      = $self->result_files->{$output_file};
+  my $filename  = $job->ticket->ticket_name . $file;
 
-    my $filename  = $job->job_data->{'input_file'};
-    my $content   = file_get_contents(join('/', $job->job_dir, $filename), sub { s/\R/\r\n/r });
-
-    $r->headers_out->add('Content-Type'         => 'text/plain');
-    $r->headers_out->add('Content-Length'       => length $content);
-    $r->headers_out->add('Content-Disposition'  => sprintf 'attachment; filename=%s', $filename);
-
-    print $content;
-
-  # if downloading the result file in any specified format
-  } else {
-
-    my $format    = $hub->param('format')   || 'vcf';
-    my $location  = $hub->param('location') || '';
-    my $filter    = $hub->param('filter')   || '';
-    my $file      = $self->result_files->{'output_file'};
-    my $filename  = join('.', $job->ticket->ticket_name, $location || (), $filter || (), $format eq 'txt' ? () : $format, $format eq 'vcf' ? '' : 'txt') =~ s/\s+/\_/gr;
-
-    $r->headers_out->add('Content-Type'         => 'text/plain');
-    $r->headers_out->add('Content-Disposition'  => sprintf 'attachment; filename=%s', $filename);
-
-    $file->content_iterate({'format' => $format, 'location' => $location, 'filter' => $filter}, sub {
-      print "$_\r\n" for @_;
-      $r->rflush;
-    });
-  }
+  $r->headers_out->add('Content-Type'         => 'text/plain');
+  $r->headers_out->add('Content-Disposition'  => sprintf 'attachment; filename=%s', $output_file);
+ 
+  return $r->sendfile(join('/', $job->job_dir, $output_file));
 }
 
 sub get_form_details {
   my $self = shift;
   if(!exists($self->{_form_details})) {
     # core form
-    
-
-
     $self->{_form_details} = {
       ld_calculation => {
         'label' => 'Choose calculation',
         'helptip' => 
-          '<b>Compute pairwise LD values in a region, compute all pairwise LD values for list of variants, or</b>'.
-          '<b>compute all LD values for a given variant and all variants that are not further away from the</b>'.
+          '<b>Compute pairwise LD values in a region, compute all pairwise LD values for list of variants, or </b>'.
+          '<b>compute all LD values for a given variant and all variants that are not further away from the </b>'.
           '<b>given variant than a given window size.</b>',
         'values' => [
           { 'value' => 'region', 'caption' => 'Pairwise LD in a given region' },
@@ -158,7 +134,9 @@ sub get_form_details {
   return $self->{_form_details};
 }
 
-sub populations_with_LD {
+# for each species with a variation database return all populations with sufficient amounts of sample genotype data stored in VCF files
+# for human we have genotypes from the 1000 Genomes Project
+sub LD_populations {
   my $self = shift;
   my $hub = $self->hub;
   my $sd = $hub->species_defs;
@@ -189,10 +167,11 @@ sub species_list {
     my @species;
 
     for ($self->valid_species) {
-
       my $db_config = $sd->get_config($_, 'databases');
-
       if ($db_config->{'DATABASE_VARIATION'}) {
+        my $adaptor = $self->hub->get_adaptor('get_PopulationAdaptor', 'variation', $_);
+        my $ld_populations = $adaptor->fetch_all_LD_Populations;
+        next unless (scalar @$ld_populations > 0);
         # if has enough sample genotype data for LD computation
         push @species, {
           'value'       => $_,
