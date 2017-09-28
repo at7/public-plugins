@@ -58,7 +58,7 @@ sub run {
   my $data_file_base_path = $self->param('data_file_base_path');
   my $vcf_tmp_dir = $self->param('vcf_tmp_dir');
 
-  my $analysis = $config->{'ld_analysis'};
+  my $analysis = $config->{'ld_calculation'};
   my @populations = ();
   if (ref($config->{'populations'}) eq "ARRAY") {
     @populations = @{$config->{'populations'}};
@@ -119,7 +119,7 @@ sub run {
         $self->warning("Call ld_feature_container_adaptor with $slice $population");        
         my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_Slice($slice, $population);
         $self->warning("Print ld_feature_container");        
-        $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id.$output_file");
+        $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id\_$chromosome\_$start\_$end");
       }
     }
   }
@@ -149,6 +149,9 @@ sub ld_feature_container_2_file {
   my $self = shift;
   my $container = shift;
   my $output_file = shift;
+  my $config = $self->param('config');
+  my $d_prime_threshold = $config->{'d_prime'};
+  my $r2_threshold = $config->{'r2'};
   my $no_vf_attribs = 1;
   $self->warning("print ld feature container to $output_file");
   my $fh = FileHandle->new($output_file, 'w');
@@ -157,6 +160,7 @@ sub ld_feature_container_2_file {
   foreach my $ld_hash (@{$container->get_all_ld_values($no_vf_attribs)}) {
     my $d_prime = $ld_hash->{d_prime};
     my $r2 = $ld_hash->{r2};
+    next unless ($d_prime >= $d_prime_threshold && $r2 >= $r2_threshold);
     my $variation1 = $ld_hash->{variation_name1};
     my $variation2 = $ld_hash->{variation_name2};
 #    my $variation1_start = $ld_hash->{variation_start1};
