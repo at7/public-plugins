@@ -48,18 +48,40 @@ sub init_from_user_input {
   # if no data found in file/url
   throw exception('InputError', 'No input data is present') unless $file_content;
 
-  my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
+  my $populations = $hub->param('populations');
+  throw exception('InputError', 'Select at least one population') unless $populations;
 
-  foreach my $key (keys %$job_data) {
-    print STDERR $key, ' ', $job_data->{$key}, "\n";
+  my @regions = ();
+  if ($hub->param('ld_calculation') eq 'region') {
+    foreach my $input_line (split/\n/, $file_content) {
+      my ($chromosome, $start, $end) = split /\s/, $input_line;  
+      throw exception('InputError', 'Input region size exceeds 100000bp') if ($start - $end + 1 > 100000);
+      push @regions, "$chromosome\_$start\_$end";
+    }
   }
 
+  my @population_names = ();
+  if (ref($populations) eq "ARRAY") {
+    push @population_names, @{$populations};
+  } else {
+    push @population_names, $populations;
+  }
+
+  my $adaptor = $self->hub->get_adaptor('get_PopulationAdaptor', 'variation', $species);
+
+  my @output_file_names = ();
+  foreach my $name (@population_names) {
+    my $population = $adaptor->fetch_by_name($name);
+    my $population_id = $population->dbID;
+    foreach my $region (@regions) {
+      push @output_file_names, "$population_id\_$region";
+    }
+  }  
+
+  my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
+  $job_data->{'output_file_names'} = \@output_file_names;
   $job_data->{'species'}    = $species;
   $job_data->{'input_file'} = $file_name;
-  $job_data->{'ld_analysis'} = 'region';
-  #$job_data->{'format'}     = $detected_format;
-
-  print STDERR "$method\n$file_content\n$file_name\n";
 
   foreach my $key (keys %$job_data) {
     print STDERR "$key $job_data->{$key}\n";
