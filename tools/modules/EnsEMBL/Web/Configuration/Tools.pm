@@ -171,6 +171,14 @@ sub populate_tree {
       )],
       { 'availability' => 1 }
     ));
+    $ld_node->append($self->create_subnode('LD/Results', $result_cap,
+      [qw(
+        details     EnsEMBL::Web::Component::Tools::LD::TicketDetails
+        ressummary  EnsEMBL::Web::Component::Tools::LD::ResultsSummary
+        results     EnsEMBL::Web::Component::Tools::LD::Results
+      )],
+      { 'availability' => 1, 'concise' => 'Linkage Disequilibrium calculator results', 'no_menu_entry' => "$action/$function" ne 'LD/Results' }
+    ));
   }
 
   ## File Chameleon
