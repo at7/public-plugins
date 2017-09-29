@@ -90,7 +90,7 @@ sub get_cacheable_form_node {
       'label'         => 'Select one or more populations',
       'values'        => $LD_populations->{$species_name},
       'size'          => '10',
-      'class'         => "_stt_$species_name",
+      'class'         => "_stt_$species_name tools_listbox",
       'multiple'      => '1'
     });
   }
