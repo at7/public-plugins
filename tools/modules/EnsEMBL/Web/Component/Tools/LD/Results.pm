@@ -54,22 +54,7 @@ sub content {
   my $job_data  = $job->job_data;
 
   my $job_config  = $job->dispatcher_data->{'config'};
-  my @output_file_names = @{$job_config->{'output_file_names'}};
 
-  my $species   = $job->species;
-  my @warnings  = grep { $_->data && ($_->data->{'type'} || '') eq 'LDWarning' } @{$job->job_message};
-
-  # this method reconstitutes the Tmpfile objects from the filenames
-  my $output_file = $output_file_names[0];  
-  my $output_file_obj = $object->result_files->{$output_file};
-
-  my $html = 'work in progress';
-  my $ticket_name = $object->parse_url_param->{'ticket_name'};
-
-#  my ($header_hash, $rows, $line_count) = @{$output_file_obj->content_parsed(\%content_args)};
-  my @content = file_get_contents(join('/', $job->job_dir, $output_file), sub { s/\R/\r\n/r });
-
-#  print STDERR "Content $content\n";
   my %header_titles = (
     'VARIANT1' => 'Variant 1',
     'VARIANT2' => 'Variant 2',
@@ -84,35 +69,48 @@ sub content {
   my @rows;
   my @headers = qw/VARIANT1 VARIANT2 R2 D_PRIME/;
 
-  my $preview_count = 10;
-  foreach my $line (@content) {
-    chomp $line;
-    my @split     = split /\s+/, $line;
-    my %raw_data  = map { $headers[$_] => $split[$_] } 0..$#headers;
-    if ($preview_count) {
-      push @rows, \%raw_data;
-      $preview_count--;
-    } else {
-      last;
+  my $species   = $job->species;
+  my @warnings  = grep { $_->data && ($_->data->{'type'} || '') eq 'LDWarning' } @{$job->job_message};
+
+  my $html = '';
+  my $ticket_name = $object->parse_url_param->{'ticket_name'};
+
+  my $result_headers = $job_config->{'result_headers'};
+  my @output_file_names = @{$job_config->{'output_file_names'}};
+
+  foreach my $output_file (@output_file_names) {
+    my $header = $result_headers->{$output_file};
+    $html .= qq{<h3>Results preview for $header</h3>};
+    my $output_file_obj = $object->result_files->{$output_file};
+    my @content = file_get_contents(join('/', $job->job_dir, $output_file), sub { s/\R/\r\n/r });
+    my @rows = ();
+    my $preview_count = 10;
+    foreach my $line (@content) {
+      chomp $line;
+      my @split     = split /\s+/, $line;
+      my %raw_data  = map { $headers[$_] => $split[$_] } 0..$#headers;
+      if ($preview_count) {
+        push @rows, \%raw_data;
+        $preview_count--;
+      } else {
+        last;
+      }
     }
+    my @table_headers = map {{
+      'key' => $_,
+      'title' => ($header_titles{$_} || $_).'<sup style="color:grey">(p)</sup>',
+      'sort' => $table_sorts{$_} || 'string',
+      'help' => 'help',
+  #    'help' => $FIELD_DESCRIPTIONS{$_} || $header_extra_descriptions->{$_},
+    }} @headers;
+
+    my $table = $self->new_table(\@table_headers, \@rows, { data_table => 1, sorting => [ 'R2 asc' ], exportable => 0, data_table_config => {bLengthChange => 'false', bFilter => 'false'}, });
+    $html .= $table->render || '<h3>No data</h3>';
+
+    my $down_url  = $object->download_url({output_file => $output_file});
+
+    $html .= qq{<p><div class="component-tools tool_buttons"><a class="export" href="$down_url">Download results</a></div></p>};
   }
-
-  my @table_headers = map {{
-    'key' => $_,
-    'title' => ($header_titles{$_} || $_).'<sup style="color:grey">(p)</sup>',
-    'sort' => $table_sorts{$_} || 'string',
-    'help' => 'help',
-#    'help' => $FIELD_DESCRIPTIONS{$_} || $header_extra_descriptions->{$_},
-  }} @headers;
-
-# render table
-  my $table = $self->new_table(\@table_headers, \@rows, { data_table => 1, sorting => [ 'R2 asc' ], exportable => 0, data_table_config => {bLengthChange => 'false', bFilter => 'false'}, });
-  $html .= $table->render || '<h3>No data</h3>';
-
-  my $down_url  = $object->download_url({output_file => $output_file});
-
-  $html .= qq{<p>Click on the button below to download the result file.</p><p><div class="component-tools tool_buttons"><a class="export" href="$down_url">Download results file</a></div></p>};
-
   return $html;
 }
 
