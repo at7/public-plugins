@@ -48,9 +48,10 @@ sub init_from_user_input {
   # if no data found in file/url
   throw exception('InputError', 'No input data is present') unless $file_content;
 
-  my $populations = $hub->param('populations');
-  throw exception('InputError', 'Select at least one population') unless $populations;
+  my @populations = $hub->param('populations');
 
+  throw exception('InputError', 'Select at least one population') unless (scalar @populations > 0);
+  my $result_headers = {};
   my @regions = ();
   if ($hub->param('ld_calculation') eq 'region') {
     foreach my $input_line (split/\n/, $file_content) {
@@ -60,26 +61,22 @@ sub init_from_user_input {
     }
   }
 
-  my @population_names = ();
-  if (ref($populations) eq "ARRAY") {
-    push @population_names, @{$populations};
-  } else {
-    push @population_names, $populations;
-  }
-
   my $adaptor = $self->hub->get_adaptor('get_PopulationAdaptor', 'variation', $species);
 
   my @output_file_names = ();
-  foreach my $name (@population_names) {
+  foreach my $name (@populations) {
     my $population = $adaptor->fetch_by_name($name);
     my $population_id = $population->dbID;
     foreach my $region (@regions) {
+      my ($chr, $start, $end) = split/_/, $region;
+      $result_headers->{"$population_id\_$region"} = "Population $name Region $chr:$start-$end";
       push @output_file_names, "$population_id\_$region";
     }
   }  
 
   my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
   $job_data->{'output_file_names'} = \@output_file_names;
+  $job_data->{'result_headers'} = $result_headers;
   $job_data->{'species'}    = $species;
   $job_data->{'input_file'} = $file_name;
 
