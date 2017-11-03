@@ -65,8 +65,6 @@ sub run {
   } else {
     @populations = ($config->{'populations'});
   }
-  my $d_prime = $config->{'d_prime'};
-  my $r2 = $config->{'r2'};
 
   my $dbc_params = $self->param('core');
   my $core_dbname = $dbc_params->{'dbname'};
@@ -105,21 +103,58 @@ sub run {
   $Bio::EnsEMBL::Variation::DBSQL::LDFeatureContainerAdaptor::TMP_PATH        = $ld_tmp_space;
 
   my $ld_feature_container_adaptor = $vdba->get_LDFeatureContainerAdaptor;
+  my $min_d_prime_threshold = $config->{'d_prime'};
+  my $min_r2_threshold = $config->{'r2'};
+  my $window_size = $config->{'window_size'};
+  $ld_feature_container_adaptor->min_r2($min_r2_threshold);
+  $ld_feature_container_adaptor->min_d_prime($min_d_prime_threshold);
+  $ld_feature_container_adaptor->max_snp_distance($window_size);
+
+  my $bin = $ld_feature_container_adaptor->vcf_executable;
 
   if ($analysis eq 'region') {
-    my @regions = @{$self->parse_regions("$working_dir/$input_file")};
+    my @regions = @{$self->parse_input("$working_dir/$input_file")};
     foreach my $region (@regions) {
+      $self->warning("region $region");
       my ($chromosome, $start, $end) = split /\s/, $region;
       my $slice = $slice_adaptor->fetch_by_region('chromosome', $chromosome, $start, $end);
       foreach my $population_name (@populations) {
         my $population = $population_adaptor->fetch_by_name($population_name);
         my $population_id = $population->dbID;
-        my $bin = $ld_feature_container_adaptor->vcf_executable;
-        $self->warning("vcf_executable $bin");
         $self->warning("Call ld_feature_container_adaptor with $slice $population");        
         my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_Slice($slice, $population);
         $self->warning("Print ld_feature_container");        
         $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id\_$chromosome\_$start\_$end");
+      }
+    }
+  }
+  elsif ($analysis eq 'pairwise') {
+    my @variants = @{$self->parse_input("$working_dir/$input_file")};
+    my @vfs = ();
+    foreach my $variant (@variants) {
+      my $vf = $variation_adaptor->fetch_by_name($variant)->get_all_VariationFeatures->[0];
+      push @vfs, $vf;
+    }
+    my $vf_count = scalar @vfs;
+    $self->warning("VF count $vf_count");
+    foreach my $population_name (@populations) {
+      my $population = $population_adaptor->fetch_by_name($population_name);
+      my $population_id = $population->dbID;
+      my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_VariationFeatures(\@vfs, $population);
+      $self->warning("$working_dir/$population_id");
+      $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id");
+    }
+  }
+  elsif ($analysis eq 'center') {
+    my @variants = @{$self->parse_input("$working_dir/$input_file")};
+    foreach my $variant (@variants) {
+      my $vf = $variation_adaptor->fetch_by_name($variant)->get_all_VariationFeatures->[0];
+      foreach my $population_name (@populations) {
+        my $population = $population_adaptor->fetch_by_name($population_name);
+        my $population_id = $population->dbID;
+        my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_VariationFeature($vf, $population);
+        $self->warning("$working_dir/$population_id\_$variant");
+        $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id\_$variant");
       }
     }
   }
@@ -132,40 +167,34 @@ sub write_output {
   return 1;
 }
 
-sub parse_regions {
+sub parse_input {
   my $self = shift;
   my $file = shift;
-  my @regions = ();
+  my @input = ();
   my $fh = FileHandle->new($file, 'r');
   while (<$fh>) {
     chomp;
-    push @regions, $_;
+    s/^\s+|(\s+|\R)$//g;
+    push @input, $_;
   }
   $fh->close;
-  return \@regions;
+  return \@input;
 }
 
 sub ld_feature_container_2_file {
   my $self = shift;
   my $container = shift;
   my $output_file = shift;
-  my $config = $self->param('config');
-  my $d_prime_threshold = $config->{'d_prime'};
-  my $r2_threshold = $config->{'r2'};
-  my $no_vf_attribs = 1;
-  $self->warning("print ld feature container to $output_file");
+  my $no_vf_attribs = 0;
   my $fh = FileHandle->new($output_file, 'w');
-  my $count = scalar @{$container->get_all_ld_values($no_vf_attribs)};
-  $self->warning("write $count pairs");
   foreach my $ld_hash (@{$container->get_all_ld_values($no_vf_attribs)}) {
     my $d_prime = $ld_hash->{d_prime};
     my $r2 = $ld_hash->{r2};
-    next unless ($d_prime >= $d_prime_threshold && $r2 >= $r2_threshold);
     my $variation1 = $ld_hash->{variation_name1};
     my $variation2 = $ld_hash->{variation_name2};
-#    my $variation1_start = $ld_hash->{variation_start1};
-#    my $variation2_start = $ld_hash->{variation_start2};
-    print $fh join("\t", $variation1, $variation2, $r2, $d_prime), "\n";
+    my $variation1_start = $ld_hash->{variation_start1};
+    my $variation2_start = $ld_hash->{variation_start2};
+    print $fh join("\t", $variation1, $variation2, $r2, $d_prime, $variation1_start, $variation2_start), "\n";
   }
   $fh->close;
 }
