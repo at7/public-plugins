@@ -43,36 +43,76 @@ sub init_from_user_input {
   my $description = sprintf 'LD analysis of %s in %s', ($hub->param('name') || ($method eq 'text' ? 'pasted data' : ($method eq 'url' ? 'data from URL' : sprintf("%s", $hub->param('file'))))), $species;
 
   # Get file content and name
+  
   my ($file_content, $file_name) = $self->get_input_file_content($method);
 
   # if no data found in file/url
-  throw exception('InputError', 'No input data is present') unless $file_content;
+  throw exception('InputError', "No input data is present") unless $file_content;
 
   my @populations = $hub->param('populations');
 
   throw exception('InputError', 'Select at least one population') unless (scalar @populations > 0);
-  my $result_headers = {};
-  my @regions = ();
-  if ($hub->param('ld_calculation') eq 'region') {
-    foreach my $input_line (split/\n/, $file_content) {
-      my ($chromosome, $start, $end) = split /\s/, $input_line;  
-      throw exception('InputError', 'Input region size exceeds 100000bp') if ($start - $end + 1 > 100000);
-      push @regions, "$chromosome\_$start\_$end";
-    }
-  }
 
   my $adaptor = $self->hub->get_adaptor('get_PopulationAdaptor', 'variation', $species);
 
+  my $result_headers = {};
   my @output_file_names = ();
-  foreach my $name (@populations) {
-    my $population = $adaptor->fetch_by_name($name);
-    my $population_id = $population->dbID;
-    foreach my $region (@regions) {
-      my ($chr, $start, $end) = split/_/, $region;
-      $result_headers->{"$population_id\_$region"} = "Population $name Region $chr:$start-$end";
-      push @output_file_names, "$population_id\_$region";
+
+  # check r2 and d_prime values
+  my $r2 = $hub->param('r2');
+  throw exception('InputError', "r2 needs to be between 0.0 and 1.0") if ( $r2 < 0.0 || $r2 > 1.0);
+
+  my $d_prime = $hub->param('d_prime');
+  throw exception('InputError', "D' needs to be between 0.0 and 1.0") if ( $d_prime < 0.0 || $d_prime > 1.0);
+
+  my $window_size = $hub->param('window_size');
+  throw exception('InputError', "Window size needs to be between 1 and 500000 kb") if ( $window_size < 0.0 || $window_size > 500_000);
+
+  if ($hub->param('ld_calculation') eq 'pairwise' || $hub->param('ld_calculation') eq 'center') {
+    foreach my $input_line (split/\R/, $file_content) {
+      throw exception('InputError', 'Wrong input format. Expecting rs variant identifiers as input.') unless ($input_line =~ /^rs/);
     }
-  }  
+  }
+
+  if ($hub->param('ld_calculation') eq 'region') {
+    my @regions = ();
+    foreach my $input_line (split/\R/, $file_content) {
+      my ($chromosome, $start, $end) = split /\s/, $input_line;  
+      throw exception('InputError', 'Wrong input format. A region needs to be defined by sequence name start end. For example 5 62797383 63627669') unless ($chromosome && $start && $end);
+      throw exception('InputError', 'Input region size exceeds 500000bp') if ($start - $end + 1 > 500000);
+      push @regions, "$chromosome\_$start\_$end";
+    }
+    foreach my $name (@populations) {
+      my $population = $adaptor->fetch_by_name($name);
+      my $population_id = $population->dbID;
+      foreach my $region (@regions) {
+        my ($chr, $start, $end) = split/_/, $region;
+        $result_headers->{"$population_id\_$region"} = "Population $name Region $chr:$start-$end";
+        push @output_file_names, "$population_id\_$region";
+      }
+    }  
+  }
+  elsif ($hub->param('ld_calculation') eq 'pairwise') {
+    foreach my $name (@populations) {
+      my $population = $adaptor->fetch_by_name($name);
+      my $population_id = $population->dbID;
+      $result_headers->{$population_id} = "Population $name";
+      push @output_file_names, $population_id;
+    }  
+  } 
+  elsif ($hub->param('ld_calculation') eq 'center') {
+    foreach my $name (@populations) {
+      my $population = $adaptor->fetch_by_name($name);
+      my $population_id = $population->dbID;
+      foreach my $variant (split/\R/, $file_content) {
+        $result_headers->{"$population_id\_$variant"} = "Population $name Center variant: $variant";
+        push @output_file_names, "$population_id\_$variant";
+      }
+    }  
+  }
+  else {
+    throw exception('InputError', "Unknown ld calculation. Neither region, pairwise or center");
+  }
 
   my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
   $job_data->{'output_file_names'} = \@output_file_names;
