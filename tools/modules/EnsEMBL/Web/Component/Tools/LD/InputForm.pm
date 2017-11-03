@@ -44,9 +44,9 @@ sub get_cacheable_form_node {
   my $form            = $self->new_tool_form({'class' => 'ld-form'});
   my $fd              = $object->get_form_details;
   my $input_fieldset  = $form->add_fieldset({'no_required_notes' => 1});
-  my $input_formats   = [{ 'value' => 'region', 'caption' => 'Genomic regions', 'example' => qq(1  809238  909238\n3  361464  861464) },];
-  my $input_formats_variant   = [{ 'value' => 'region', 'caption' => 'Variant IDs', 'example' => qq(rs699\nrs7383789) },];
-
+  my $input_formats   = [{ 'value' => 'region', 'caption' => 'TODO make switchable', 'example' => qq(1  809238  909238\n3  361464  861464) }];
+#                          'pairwise' => [{ 'value' => 'pairwise', 'caption' => 'Variant IDs', 'example' => qq(rs699\nrs7383789) },]
+# Genomic regions
 
   # choose method
   $input_fieldset->add_field({
@@ -96,38 +96,22 @@ sub get_cacheable_form_node {
   }
 
   $input_fieldset->add_field({
-    'field_class' => '_stt_region',
     'label'         => 'Either paste data',
-    'elements'      => [{
-      'type'          => 'text',
-      'name'          => 'text',
-      'class'         => '_stt_region',
-    }, {
-      'class'         => '_stt_region',
-      'type'          => 'noedit',
-      'noinput'       => 1,
-      'is_html'       => 1,
-      'caption'       => sprintf('<span class="small"><b>Example input:&nbsp;</b>%s</span>',
-        join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats))
-      )
-    },]
-  });
-
-  $input_fieldset->add_field({
-    'field_class' => [qw/_stt_pairwise _stt_variant/],
-    'label'         => 'Either paste data',
-    'elements'      => [{
-      'type'          => 'text',
-      'name'          => 'text',
-      'class'         => '_stt_pairwise _stt_variant',
-    }, {
-      'type'          => 'noedit',
-      'noinput'       => 1,
-      'is_html'       => 1,
-      'caption'       => sprintf('<span class="small"><b>Example input:&nbsp;</b>%s</span>',
-        join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats_variant))
-      )
-    },]
+    'elements'      => [
+      {
+        'type'          => 'text',
+        'class'         => 'input_data',
+        'name'          => 'text',
+      }, 
+      {
+        'type'          => 'noedit',
+        'noinput'       => 1,
+        'is_html'       => 1,
+        'caption'       => sprintf('<span class="small"><b>Example input:&nbsp;</b>%s</span>',
+          join(', ', (map { sprintf('<a href="#" class="_example_input" rel="%s">%s</a>', $_->{'value'}, $_->{'caption'}) } @$input_formats))
+        )
+      }
+    ]
   });
 
   $input_fieldset->add_field({
@@ -146,27 +130,30 @@ sub get_cacheable_form_node {
   });
 
   $input_fieldset->add_field({
-    'type'          => 'string',
-    'name'          => 'r2',
-    'label'         => 'Threshold for r2',
-    'value' => '0.8',
+    'type'    => 'string',
+    'name'    => 'r2',
+    'label'   => $fd->{'r2_threshold'}->{'label'},
+    'helptip' => $fd->{'r2_threshold'}->{'helptip'},
+    'value'   => $fd->{'r2_threshold'}->{'value'},
   });
 
   $input_fieldset->add_field({
-    'type'          => 'string',
-    'name'          => 'd_prime',
-    'label'         => "Threshold for D'",
-    'value' => '0.8',
+    'type'    => 'string',
+    'name'    => 'd_prime',
+    'label'   => $fd->{'d_prime_threshold'}->{'label'},
+    'helptip' => $fd->{'d_prime_threshold'}->{'helptip'},
+    'value' => $fd->{'d_prime_threshold'}->{'value'},
   });
 
   $input_fieldset->add_field({
-    'field_class' => '_stt_variant',
-    'label' => 'Window size',
+    'field_class' => '_stt_center',
+    'label' => $fd->{'window_size'}->{'label'},
+    'helptip' => $fd->{'window_size'}->{'helptip'},
     'elements' => [{
       'name'  => 'window_size',
-      'element_class' => '_stt_variant',
+      'element_class' => '_stt_center',
       'type'  => 'string',
-      'value' => '100000',
+      'value' => $fd->{'window_size'}->{'value'},
     }]
   });
 
@@ -196,11 +183,6 @@ sub js_params {
   my $params  = $self->SUPER::js_params(@_);
 
   return $params;
-}
-
-sub get_populations {
-  my $self = shift;
-  return [ { value => '1000GENOMES:phase_3:GBR', caption => '1000GENOMES:phase_3:GBR' }, {value => '1000GENOMES:phase_3:GWD', caption => '1000GENOMES:phase_3:GWD'}, {value => '1000GENOMES:phase_3:CHB', caption => '1000GENOMES:phase_3:CHB'}];
 }
 
 1;
