@@ -114,20 +114,23 @@ sub get_form_details {
         'values' => [
           { 'value' => 'region', 'caption' => 'Pairwise LD in a given region' },
           { 'value' => 'pairwise', 'caption' => 'Pairwise LD for a given list of variants' },
-          { 'value' => 'variant', 'caption' => 'LD for a given variant within a defined region' },
+          { 'value' => 'center', 'caption' => 'LD for a given variant within a defined region' },
         ],
       },
       r2_threshold => {
-        'label' => 'r2',
-        'helptip' => 'Only include variants whose r2 value is greater than the given value'
+        'label' => 'Threshold for r<sup>2</sup>',
+        'helptip' => 'Only include variants whose r<sup>2</sup> value is greater than or equal to the given value. r<sup>2</sup> needs to be in the range of 0.0 and 1.0.',
+        'value' => '0.0', 
       },
       d_prime_threshold => {
-        'label' => 'd_prime',
-        'helptip' => 'Only include variants whose d_prime value is greater than the given value'
+        'label' => "Threshold for D'",
+        'helptip' => 'Only include variants whose D\' value is greater than or equal to the given value. D\' needs to be in the range of 0.0 and 1.0.',
+        'value' => '0.0',
       },
       window_size => {
         'label' => 'window size',
-        'helptip' => 'Only compute LD between the input variant and all variants that are not further away from the input variant than the given window size',
+        'helptip' => 'Only compute LD between the input variant and all variants that are not further away from the input variant than the given window size. The maximum allowed size is 500kb.',
+        'value' => '250000',
       },
     };
   }
