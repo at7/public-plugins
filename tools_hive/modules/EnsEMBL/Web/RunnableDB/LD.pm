@@ -115,15 +115,12 @@ sub run {
   if ($analysis eq 'region') {
     my @regions = @{$self->parse_input("$working_dir/$input_file")};
     foreach my $region (@regions) {
-      $self->warning("region $region");
       my ($chromosome, $start, $end) = split /\s/, $region;
       my $slice = $slice_adaptor->fetch_by_region('chromosome', $chromosome, $start, $end);
       foreach my $population_name (@populations) {
         my $population = $population_adaptor->fetch_by_name($population_name);
         my $population_id = $population->dbID;
-        $self->warning("Call ld_feature_container_adaptor with $slice $population");        
         my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_Slice($slice, $population);
-        $self->warning("Print ld_feature_container");        
         $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id\_$chromosome\_$start\_$end");
       }
     }
@@ -136,12 +133,10 @@ sub run {
       push @vfs, $vf;
     }
     my $vf_count = scalar @vfs;
-    $self->warning("VF count $vf_count");
     foreach my $population_name (@populations) {
       my $population = $population_adaptor->fetch_by_name($population_name);
       my $population_id = $population->dbID;
       my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_VariationFeatures(\@vfs, $population);
-      $self->warning("$working_dir/$population_id");
       $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id");
     }
   }
@@ -153,7 +148,6 @@ sub run {
         my $population = $population_adaptor->fetch_by_name($population_name);
         my $population_id = $population->dbID;
         my $ld_feature_container = $ld_feature_container_adaptor->fetch_by_VariationFeature($vf, $population);
-        $self->warning("$working_dir/$population_id\_$variant");
         $self->ld_feature_container_2_file($ld_feature_container, "$working_dir/$population_id\_$variant");
       }
     }
@@ -192,9 +186,14 @@ sub ld_feature_container_2_file {
     my $r2 = $ld_hash->{r2};
     my $variation1 = $ld_hash->{variation_name1};
     my $variation2 = $ld_hash->{variation_name2};
-    my $variation1_start = $ld_hash->{variation_start1};
-    my $variation2_start = $ld_hash->{variation_start2};
-    print $fh join("\t", $variation1, $variation2, $r2, $d_prime, $variation1_start, $variation2_start), "\n";
+    my $vf1 = $ld_hash->{variation1};
+    my $vf2 = $ld_hash->{variation2};
+    my $vf1_start = $vf1->seq_region_start;
+    my $vf1_seq_region_name = $vf1->seq_region_name;
+    my $vf2_start = $vf2->seq_region_start;
+    my $vf2_seq_region_name = $vf2->seq_region_name;
+
+    print $fh join("\t", $variation1, "$vf1_seq_region_name:$vf1_start", $variation2, "$vf2_seq_region_name:$vf2_start", $r2, $d_prime), "\n";
   }
   $fh->close;
 }
