@@ -74,6 +74,8 @@ sub init_from_user_input {
     }
   }
 
+  my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
+
   if ($hub->param('ld_calculation') eq 'region') {
     my @regions = ();
     foreach my $input_line (split/\R/, $file_content) {
@@ -101,28 +103,36 @@ sub init_from_user_input {
     }  
   } 
   elsif ($hub->param('ld_calculation') eq 'center') {
+    my $variation_adaptor = $self->hub->get_adaptor('get_VariationAdaptor', 'variation', $species);
+    my $manhattan_plot_input = {};
     foreach my $name (@populations) {
       my $population = $adaptor->fetch_by_name($name);
       my $population_id = $population->dbID;
-      foreach my $variant (split/\R/, $file_content) {
-        $result_headers->{"$population_id\_$variant"} = "Population $name Center variant: $variant";
-        push @output_file_names, "$population_id\_$variant";
+      foreach my $variant_name (split/\R/, $file_content) {
+        my $vf = $variation_adaptor->fetch_by_name($variant_name)->get_all_VariationFeatures->[0];
+        $result_headers->{"$population_id\_$variant_name"} = "population <em>$name</em> and variant: <em>$variant_name</em>";
+        push @output_file_names, "$population_id\_$variant_name";
+        $manhattan_plot_input->{$variant_name} = {
+          'pop1' => $population_id,
+          'v' => $variant_name, 
+          'vf' => $vf->dbID,
+        };
       }
     }  
+    $job_data->{'manhattan_plot_input'} = $manhattan_plot_input;
   }
   else {
     throw exception('InputError', "Unknown ld calculation. Neither region, pairwise or center");
   }
 
-  my $job_data = { map { my @val = $hub->param($_); $_ => @val > 1 ? \@val : $val[0] } grep { $_ !~ /^text/ && $_ ne 'file' } $hub->param };
   $job_data->{'output_file_names'} = \@output_file_names;
   $job_data->{'result_headers'} = $result_headers;
   $job_data->{'species'}    = $species;
   $job_data->{'input_file'} = $file_name;
 
-  foreach my $key (keys %$job_data) {
-    print STDERR "$key $job_data->{$key}\n";
-  }
+#  foreach my $key (keys %$job_data) {
+#    print STDERR "$key $job_data->{$key}\n";
+#  }
 
   $self->add_job(EnsEMBL::Web::Job::LD->new($self, {
     'job_desc'    => $description,
