@@ -44,9 +44,6 @@ sub fetch_input {
 sub run {
   my $self = shift;
 
-  # method: region, pairwise, center
-  # populations
-  # thresholds r2 d_prime
   my $working_dir = $self->param('working_dir');
   my $output_file = $self->param('output_file');
   my $input_file = $self->param('input_file');
@@ -66,35 +63,31 @@ sub run {
     @populations = ($config->{'populations'});
   }
 
-  my $dbc_params = $self->param('core');
-  my $core_dbname = $dbc_params->{'dbname'};
-  my $core_host = $dbc_params->{'host'};
-  my $core_user = $dbc_params->{'user'};
-  $self->warning("$core_dbname $core_user $core_host");
+  my $db_params = $self->param('db_params');
+  my $dbname = $db_params->{'dbname'};
+  my $host = $db_params->{'host'};
+  my $user = $db_params->{'user'};
+  my $pass = $db_params->{'pass'};
+  my $port = $db_params->{'port'};
 
-  my $dbv_params = $self->param('variation');
-  my $variation_dbname = $dbv_params->{'dbname'};
-  my $variation_host = $dbv_params->{'host'};
-  my $variation_user = $dbv_params->{'user'};
-  $self->warning("$variation_dbname $variation_user $variation_host");
+  my $species = $self->param('species');
 
   my $registry = 'Bio::EnsEMBL::Registry';
   $registry->load_registry_from_db(
-    -host => 'ensembldb.ensembl.org',
-    -user => 'anonymous',
+    -host => $host,
+    -user => $user,
+    -pass => $pass,
+    -port => $port,
+    -species => $species,
   );
 
-  my $species = 'homo_sapiens';
-
   my $vdba = $registry->get_DBAdaptor($species, 'variation');
-
   $vdba->vcf_config_file($vcf_config);
   $vdba->vcf_root_dir($data_file_base_path);
   $vdba->vcf_tmp_dir($vcf_tmp_dir);
   $vdba->use_vcf(1);
 
   my $cdba = $registry->get_DBAdaptor($species, 'core');
-
   my $population_adaptor = $vdba->get_PopulationAdaptor;
   my $variation_adaptor = $vdba->get_VariationAdaptor;
   my $slice_adaptor = $cdba->get_SliceAdaptor;
