@@ -27,7 +27,6 @@ use warnings;
 use previous qw(prepare_to_dispatch);
 
 sub prepare_to_dispatch {
-  ## @plugin
   my $self              = shift;
   my $data              = $self->PREV::prepare_to_dispatch(@_) or return;
   my $rose_object       = $self->rose_object;
@@ -38,19 +37,19 @@ sub prepare_to_dispatch {
   $data->{vcf_config} = $c->{'CONFIG'};
   $data->{data_file_base_path} = $sd->DATAFILE_BASE_PATH;
   $data->{vcf_tmp_dir} = $sd->ENSEMBL_TMP_DIR;
-
 #  $data->{ld_binary}    = $sd->ENSEMBL_LD_VCF_FILE;
   $data->{ld_binary}    = '/homes/ens_adm26/sandbox/ensembl-variation/C_code/ld_vcf';
   $data->{ld_tmp_space} = $sd->ENSEMBL_TMP_TMP;
-  foreach my $db (qw/core variation/) {
-    my $dba =   $hub->database($db, $rose_object->species);
-    my $dbc = $dba->dbc;
-    $data->{$db}  = {
-      dbname => $dbc->dbname,
-      user => $dbc->user,
-      host => $dbc->host,
-    };
-  }
+  my $dba =   $hub->database('variation', $rose_object->species);
+  my $dbc = $dba->dbc;
+  $data->{db_params}  = {
+    dbname => $dbc->dbname,
+    user => $dbc->user,
+    host => $dbc->host,
+    pass => $dbc->password,
+    port => $dbc->port,
+  };
+  $data->{species} = $rose_object->species; 
 
 # config for vcf files
 
