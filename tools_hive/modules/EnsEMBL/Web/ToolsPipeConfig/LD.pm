@@ -37,9 +37,7 @@ sub resource_classes {
 
 sub pipeline_analyses {
   my ($class, $conf) = @_;
-  print STDERR "pipeline_analyses\n";
   my $sd = $conf->species_defs;
-
   return [{
     '-logic_name'           => 'LD',
     '-module'               => 'EnsEMBL::Web::RunnableDB::LD',
